@@ -1,0 +1,3 @@
+## Prompt
+
+I am building an app to automate creating ebay listings. To start, it will be used for collectible items - mainly trading cards and sealed product, as well as video games. Input requirements will be photos of the item, whether it should be an auction with the desired start time or buy it now, and shipping options. The app will perform market research using ebay, 130point, collectr, and any other applicable sources. The app will generate a listing draft with a concise item description and a price listing based on the research. 

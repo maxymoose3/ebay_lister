@@ -1,0 +1,8 @@
+.env
+.ebay_tokens.json
+.ebay_state.json
+__pycache__/
+.DS_Store
+.venv/
+data/
+.pytest_cache/

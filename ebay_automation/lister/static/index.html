@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>eBay Lister</title>
+<style>
+:root{--bg:#f5f5f2;--card:#fff;--ink:#1d2327;--mute:#646c72;--line:#dcdcd6;--acc:#14539a;--ok:#1d6b3a;--warn:#8a5200;--bad:#a3261d}
+@media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#16191c;--card:#1f2428;--ink:#e8eaec;--mute:#9aa3aa;--line:#343b41;--acc:#79b4f2;--ok:#72c793;--warn:#e2ae62;--bad:#f08b82}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
+main{max-width:1080px;margin:0 auto;padding:20px 16px 80px}h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:28px 0 10px}h3{font-size:14px;margin:18px 0 6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:14px}
+.mute{color:var(--mute)}.small{font-size:13px}.warn{color:var(--warn)}.bad{color:var(--bad)}.ok{color:var(--ok)}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
+.ph{padding:0;border:2px solid transparent;border-radius:6px;background:none;cursor:pointer;overflow:hidden;position:relative;color:inherit}
+.ph img,.thumbs img{width:100%;aspect-ratio:1;object-fit:cover;display:block;border-radius:4px}.ph[aria-pressed=true]{border-color:var(--acc)}
+.ph span{font-size:11px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ph.used{opacity:.45}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap}.thumbs img{width:84px}
+button,.btn{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:6px;padding:7px 13px;cursor:pointer}
+button.pri{background:var(--acc);border-color:var(--acc);color:var(--bg)}button.danger{color:var(--bad);border-color:var(--bad)}button:disabled{opacity:.5;cursor:default}
+input,select,textarea{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;max-width:100%}
+input[type=number]{width:92px}textarea,input.wide{width:100%}label{display:inline-flex;gap:6px;align-items:center}
+.price{font-size:26px;font-weight:650;font-variant-numeric:tabular-nums}.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}
+td,th{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.off td{opacity:.6}a{color:var(--acc)}details summary{cursor:pointer}.tag{font-size:12px;border:1px solid var(--line);border-radius:99px;padding:1px 9px}
+#msg{position:fixed;left:16px;right:16px;bottom:16px;max-width:700px;margin:auto;background:var(--card);border:1px solid var(--bad);color:var(--bad);border-radius:8px;padding:10px 14px}
+</style></head><body><main>
+<h1>eBay Lister</h1><div class="mute small" id="status"></div>
+<h2>1. Photos</h2>
+<section class="card"><div class="row"><input type="file" id="up" multiple accept="image/*,.heic,.heif" aria-label="Add photos">
+<button id="all">Select unused</button><button id="none">Clear</button><span class="mute small" id="count"></span></div><div class="grid" id="photos" style="margin-top:12px"></div></section>
+<h2>2. Listing options</h2>
+<section class="card"><div id="opts"></div><p class="small mute">Applied to every item identified now. You can change them per item below.</p>
+<button class="pri" id="identify">Identify items</button> <span class="mute" id="busy"></span></section>
+<h2>3. Drafts</h2><div id="drafts"></div></main><div id="msg" role="alert" hidden></div>
+<script>
+const $=s=>document.querySelector(s),sel=new Set(),pending={};let S=null;
+const el=(t,a={},...k)=>{const e=document.createElement(t);for(const[n,v]of Object.entries(a)){if(n.startsWith('on'))e[n]=v;else if(n in e&&n!=='list')e[n]=v;else e.setAttribute(n,v)}e.append(...k.filter(x=>x!=null&&x!==false));return e};
+let mt;function fail(t){const m=$('#msg');m.textContent=t;m.hidden=false;clearTimeout(mt);mt=setTimeout(()=>m.hidden=true,9000)}
+async function api(m,p,b){const r=await fetch('/api'+p,{method:m,headers:{'X-Lister':'1',...(b&&!(b instanceof FormData)?{'Content-Type':'application/json'}:{})},body:b?(b instanceof FormData?b:JSON.stringify(b)):undefined});
+ const j=await r.json().catch(()=>({}));if(!r.ok)throw Error(typeof j.detail==='string'?j.detail:JSON.stringify(j.detail||r.status));return j}
+async function job(m,p,b){const{job:id}=await api(m,p,b);for(;;){await new Promise(r=>setTimeout(r,1500));const j=await api('GET','/jobs/'+id);if(j.state==='done')return j.result;if(j.state==='error')throw Error(j.error)}}
+const guard=f=>async(...a)=>{try{return await f(...a)}catch(e){fail(e.message)}};
+const money=v=>v==null?'–':S.currency+' '+Number(v).toFixed(2);
+// datetime-local is wall time in the seller's timezone (Settings), whatever the browser's zone is
+function zoneParts(d){return Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:S.timezone,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).formatToParts(d).map(p=>[p.type,p.value]))}
+function toLocal(iso){if(!iso)return'';const p=zoneParts(new Date(iso));return`${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`}
+function fromLocal(v){if(!v)return null;const want=Date.parse(v+':00Z');let t=want;for(let i=0;i<3;i++)t+=want-Date.parse(toLocal(new Date(t).toISOString())+':00Z');return new Date(t).toISOString()}
+function optsForm(o){const sh=o.shipping,f={};const num=(k,st)=>f[k]=el('input',{type:'number',min:0,step:st||'0.01',value:sh[k]});const chk=(k,src)=>f[k]=el('input',{type:'checkbox',checked:src[k]});
+ f.format=el('select',{},el('option',{value:'FIXED_PRICE'},'Buy It Now'),el('option',{value:'AUCTION'},'Auction'));f.format.value=o.format;
+ f.start=el('input',{type:'datetime-local',value:toLocal(o.start_time)});f.dur=el('select',{},...[1,3,5,7,10].map(d=>el('option',{value:d},d+' days')));f.dur.value=o.duration_days;
+ const L=(...k)=>el('label',{},...k),au=L('Length ',f.dur),bo=L(chk('best_offer',o),'Best Offer');const vis=()=>{au.hidden=f.format.value!=='AUCTION';au.style.display=au.hidden?'none':'';bo.style.display=f.format.value==='AUCTION'?'none':''};
+ const node=el('div',{},el('div',{className:'row'},L('Format ',f.format),L('Start ',f.start),el('span',{className:'mute small'},S.timezone+'; blank = when published'),au,bo),
+ el('div',{className:'row',style:'margin-top:10px'},'Shipping ('+S.currency+')',L(chk('us',sh),'US ',num('us_cost')),L(chk('ca',sh),'Canada ',num('ca_cost')),L(chk('intl',sh),'International ',num('intl_cost')),
+ L(chk('free_domestic',sh),'Free to US'),L(chk('local_pickup',sh),'Local pickup'),L('Handling days ',num('handling_days','1'))));f.format.onchange=vis;vis();
+ return{node,read:()=>({format:f.format.value,start_time:fromLocal(f.start.value),duration_days:+f.dur.value,best_offer:f.best_offer.checked,shipping:{ca:f.ca.checked,ca_cost:+f.ca_cost.value,us:f.us.checked,us_cost:+f.us_cost.value,intl:f.intl.checked,intl_cost:+f.intl_cost.value,free_domestic:f.free_domestic.checked,local_pickup:f.local_pickup.checked,handling_days:+f.handling_days.value}})}}
+let mainOpts;
+function photos(){const used=new Set(S.drafts.flatMap(d=>[...d.item.photos,...d.item.reference_photos]));$('#photos').replaceChildren(...S.photos.map(n=>el('button',{className:'ph'+(used.has(n)?' used':''),title:n,'aria-pressed':sel.has(n),onclick:()=>{sel.has(n)?sel.delete(n):sel.add(n);photos()}},el('img',{src:'/api/photo/'+encodeURIComponent(n)+'?size=220',alt:n,loading:'lazy'}),el('span',{},n))));
+ $('#count').textContent=sel.size+' selected';$('#identify').disabled=!sel.size||!!pending.identify;$('#all').onclick=()=>{S.photos.filter(n=>!used.has(n)).forEach(n=>sel.add(n));photos()}}
+async function load(){S=await api('GET','/state');$('#status').textContent='eBay: '+(S.ebay_signed_in?'signed in':S.ebay_keys?'keys set, not signed in':'not configured (drafting still works)');if(!mainOpts){mainOpts=optsForm(S.defaults);$('#opts').append(mainOpts.node)}photos();drafts()}
+function put(d){const i=S.drafts.findIndex(x=>x.id===d.id);if(i>=0)S.drafts[i]=d;else S.drafts.push(d);const old=document.getElementById('d-'+d.id);if(old)old.replaceWith(draft(d))}
+function drafts(){$('#drafts').replaceChildren(...(S.drafts.length?S.drafts.map(draft):[el('p',{className:'mute'},'No drafts yet. Select photos and identify items.')]))}
+const run=(d,name,f)=>guard(async()=>{pending[d.id]=name;put(S.drafts.find(x=>x.id===d.id));try{const r=await f();delete pending[d.id];put(r)}catch(e){delete pending[d.id];await load();throw e}});
+function draft(d){const busy=pending[d.id],p=d.pricing,it=d.item,auction=d.options.format==='AUCTION',c=el('article',{className:'card',id:'d-'+d.id});const A=(...k)=>c.append(...k.filter(Boolean));
+ A(el('div',{className:'row'},el('strong',{},d.text?d.text.title:it.name),el('span',{className:'tag'},busy||d.status),el('span',{className:'mute small'},it.graded===false?'':[it.set_name,it.card_number,it.grader&&it.grader+' '+it.grade,it.cert_number&&'cert '+it.cert_number].filter(Boolean).join(' · '))));
+ A(el('div',{className:'thumbs',style:'margin:10px 0'},...it.photos.map(n=>el('img',{src:'/api/photo/'+encodeURIComponent(n)+'?size=200',alt:n}))));
+ [...it.uncertainties,...p.warnings].forEach(w=>A(el('div',{className:'small warn'},'Check: '+w)));if(d.error)A(el('div',{className:'small bad'},d.error));
+ if(p.market_value!=null||d.price!=null){A(el('div',{className:'row'},el('span',{className:'price'},money(d.price)),el('span',{className:'mute'},(auction?'auction start':'Buy It Now')+' · market '+money(p.market_value)+(p.low?` (${p.low.toFixed(2)}–${p.high.toFixed(2)})`:'')+' · confidence '+p.confidence+(d.options.start_time?' · starts '+toLocal(d.options.start_time).replace('T',' '):'')+(auction?' · '+d.options.duration_days+' days':''))),el('div',{className:'small mute'},p.basis))}
+ const ov=el('input',{type:'number',step:'0.01',min:'0.01',value:d.price_override??'',placeholder:'your price'});
+ // item + options
+ const ids=['name','set_name','card_number','year','language','rarity','grader','grade','grade_label','cert_number','product_type','platform','region','condition_notes'],inp={};
+ const pick=(k,vals)=>{inp[k]=el('select',{},...vals.map(v=>el('option',{value:v},v||'—')));inp[k].value=it[k];return inp[k]};
+ const of=optsForm(d.options);
+ const editor=el('details',{},el('summary',{},'Item details and options'),el('div',{className:'row',style:'margin:8px 0'},...ids.map(k=>el('label',{className:'small'},k.replace('_',' ')+' ',inp[k]=el('input',{value:it[k],size:14}))),
+ el('label',{className:'small'},'category ',pick('category',['trading_card','sealed_product','video_game'])),el('label',{className:'small'},'card condition ',pick('raw_condition',['','near_mint','lightly_played','moderately_played','heavily_played'])),
+ el('label',{className:'small'},'completeness ',pick('completeness',['','loose','complete','sealed'])),el('label',{className:'small'},'game condition ',pick('game_condition',['','like_new','very_good','good','acceptable'])),el('label',{className:'small'},'eBay category ',inp._cat=el('input',{value:d.category_id,size:8}))),of.node,
+ el('p',{},el('button',{onclick:run(d,'saving',()=>{const item={...it};for(const k in inp)if(k!=='_cat')item[k]=inp[k].value;return api('PATCH','/drafts/'+d.id,{item,options:of.read(),...(inp._cat.value?{category_id:inp._cat.value}:{})})})},'Save details')));
+ const T={};if(d.text){T.t=el('input',{className:'wide',maxLength:80,value:d.text.title});T.d=el('textarea',{rows:7,value:d.text.description});
+ A(el('h3',{},'Title'),T.t,el('h3',{},'Description'),T.d,el('div',{className:'row',style:'margin-top:8px'},ov,el('button',{onclick:run(d,'saving',()=>api('PATCH','/drafts/'+d.id,{text:{...d.text,title:T.t.value,description:T.d.value},...(ov.value?{price_override:+ov.value}:{clear_price_override:true})}))},'Save text and price'),
+ el('button',{onclick:guard(async()=>{await navigator.clipboard.writeText(T.t.value+'\n\n'+T.d.value+'\n\n'+money(d.price))})},'Copy listing')))}
+ A(el('div',{style:'margin-top:12px'},editor));
+ if(d.status!=='identified'){const on=d.comps.filter(x=>x.included).length;A(el('details',{},el('summary',{},`Market research: ${on} of ${d.comps.length} results used`),
+ el('div',{className:'small mute'},d.sources.map(s=>`${s.source}: ${s.status}${s.detail?' ('+s.detail+')':''}`).join(' · ')),
+ el('div',{className:'scroll'},el('table',{},el('tr',{},...['Use','Type','Source','Title','Date','Price',''].map(h=>el('th',{},h))),...d.comps.slice().sort((a,b)=>b.included-a.included).map(x=>el('tr',{className:x.included?'':'off'},el('td',{},el('input',{type:'checkbox',checked:x.included,'aria-label':'Use '+x.title,onchange:run(d,'repricing',()=>api('POST',`/drafts/${d.id}/comps/${x.id}`,{included:!x.included}))})),el('td',{},x.kind),el('td',{},x.source),el('td',{},/^https?:/.test(x.url)?el('a',{href:x.url,target:'_blank',rel:'noreferrer'},x.title):x.title),el('td',{},x.date||''),el('td',{className:'n'},money(x.price_local)),el('td',{className:'mute'},x.note)))))))}
+ const ta=el('textarea',{rows:4,placeholder:'Paste results copied from 130point, Collectr, Terapeak or eBay sold'}),src=el('select',{},...['130point','Collectr','Terapeak','eBay sold','Other'].map(x=>el('option',{},x))),cur=el('select',{},el('option',{},'USD'),el('option',{},'CAD'));
+ const mp=el('input',{type:'number',step:'0.01',min:'0.01',placeholder:'sold for'}),mc=el('select',{},el('option',{},'USD'),el('option',{},'CAD')),md=el('input',{type:'date'});
+ A(el('details',{},el('summary',{},'Add comps from 130point, Collectr and others'),el('p',{className:'row small'},...Object.entries(d.links).map(([k,v])=>el('a',{href:v,target:'_blank',rel:'noreferrer'},k))),el('p',{className:'small mute'},'Search text for 130point and Collectr: ',el('code',{},d.search_text)),ta,el('div',{className:'row',style:'margin:8px 0'},src,el('label',{},'$ means ',cur),el('button',{onclick:run(d,'reading paste',()=>job('POST',`/drafts/${d.id}/paste`,{text:ta.value,source:src.value,dollar_currency:cur.value}))},'Add pasted results')),
+ el('div',{className:'row'},'One sale:',mp,mc,md,el('button',{onclick:run(d,'repricing',()=>api('POST',`/drafts/${d.id}/comps`,{price:+mp.value,currency:mc.value,date:md.value||null}))},'Add'))));
+ const acts=el('div',{className:'row',style:'margin-top:14px'});const B=(t,cls,f,dis)=>acts.append(el('button',{className:cls,disabled:!!busy||dis,onclick:f},t));
+ if(d.status!=='published'){B(d.status==='identified'?'Research and draft':'Research again',d.status==='identified'?'pri':'',run(d,'researching…',()=>job('POST',`/drafts/${d.id}/research`)));
+ if(d.text){B('Send to eBay (not live)','',run(d,'sending…',()=>job('POST',`/drafts/${d.id}/push`)),!S.ebay_signed_in);
+ if(d.status==='pushed'){const when=d.options.start_time?'scheduled for '+toLocal(d.options.start_time).replace('T',' '):'live now';B('Publish…','danger',()=>{acts.replaceChildren(el('strong',{},`Publish at ${money(d.price)}, ${when}?`),el('button',{className:'danger',onclick:run(d,'publishing…',()=>job('POST',`/drafts/${d.id}/publish`,{confirm:true,expected_price:d.price}))},'Yes, publish'),el('button',{onclick:()=>put(d)},'Cancel'))})}}
+ B('Delete draft','',()=>acts.replaceChildren('Delete this draft? Photos are kept.',el('button',{className:'danger',onclick:guard(async()=>{await api('DELETE','/drafts/'+d.id);await load()})},'Delete'),el('button',{onclick:()=>put(d)},'Cancel')))}
+ else A(el('p',{className:'ok'},'Published: listing '+d.listing_id));A(acts);return c}
+$('#none').onclick=()=>{sel.clear();photos()};
+$('#up').onchange=guard(async e=>{const f=new FormData();for(const x of e.target.files)f.append('files',x);$('#count').textContent='uploading…';const{saved}=await api('POST','/photos',f);saved.forEach(n=>sel.add(n));e.target.value='';await load()});
+$('#identify').onclick=guard(async()=>{pending.identify=1;photos();$('#busy').textContent='Identifying…';try{const r=await job('POST','/identify',{photos:[...sel],options:mainOpts.read()});sel.clear();$('#busy').textContent=`${r.drafts.length} item(s) found.`+(r.unassigned.length?' Not matched: '+r.unassigned.join(', '):'')}catch(e){$('#busy').textContent='';throw e}finally{delete pending.identify;await load()}});
+guard(load)();
+</script></body></html>
