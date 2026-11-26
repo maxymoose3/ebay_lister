@@ -42,8 +42,8 @@ def main() -> int:
     dr.add_argument("--auction", action="store_true", help="auction instead of Buy It Now")
     dr.add_argument("--start", help="local start time, e.g. '2026-11-29 18:00'")
     dr.add_argument("--days", type=int, default=7, choices=[1, 3, 5, 7, 10], help="auction length")
-    dr.add_argument("--no-canada", action="store_true")
-    dr.add_argument("--intl", action="store_true")
+    dr.add_argument("--us", action="store_true", help="also ship to the US yourself, outside eBay International Shipping")
+    dr.add_argument("--intl", action="store_true", help="also ship worldwide yourself, outside eBay International Shipping")
     dr.add_argument("--price", type=float, help="Buy It Now price, or auction start (default: LISTER_AUCTION_START)")
     sub.add_parser("auth")
     sub.add_parser("shipping-services")
@@ -60,7 +60,7 @@ def main() -> int:
             o.format, o.duration_days = ("AUCTION" if a.auction else "FIXED_PRICE"), a.days
             if a.start:
                 o.start_time = datetime.fromisoformat(a.start).replace(tzinfo=ZoneInfo(pipe.s.timezone))
-            o.shipping.ca, o.shipping.intl = not a.no_canada, a.intl
+            o.shipping.us, o.shipping.intl = a.us, a.intl
             check_options(o)
             drafts, left = pipe.identify([Path(p).name for p in a.photos], o)
             for d in drafts:

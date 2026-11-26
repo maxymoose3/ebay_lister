@@ -1,6 +1,7 @@
 # eBay Lister
 
-Photos in, eBay.com listing drafts (USD, shipped from Canada, no returns) out. For trading cards, sealed product and video games.
+Photos in, eBay.ca listing drafts (CAD, shipped from Canada, no returns) out. Buyers outside Canada are served by
+eBay International Shipping (eIS) when your account is enrolled. For trading cards, sealed product and video games.
 
 ## Setup
 
@@ -34,8 +35,11 @@ is over 80 characters, the label wording is dropped first, then the set name is 
 
 ## Prices
 
-The app does not look up prices. Enter the Buy It Now price for each listing. Auctions start at `LISTER_AUCTION_START` (USD 20)
+The app does not look up prices. Enter the Buy It Now price for each listing. Auctions start at `LISTER_AUCTION_START` (CAD 20)
 unless you enter another start price. Shipping is charged separately at the flat rates in `.env`, as on eBay.
+
+Canada shipping is on by default and is what you pay to reach the eIS hub for buyers abroad. US and International are
+off by default; turn them on only to ship those buyers yourself instead of through eIS.
 
 ## Layout
 

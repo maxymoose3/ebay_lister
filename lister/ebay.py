@@ -135,18 +135,19 @@ def fulfillment_payload(sh: Shipping, s: Settings) -> dict:
     def money(v: float) -> dict:
         return {"value": f"{v:.2f}", "currency": s.currency}
 
-    for on, code in ((sh.us, s.ship_us_service), (sh.ca, s.ship_ca_service), (sh.intl, s.ship_intl_service)):
-        if on and code.startswith("CA_"):
-            raise EbayError(f"{code} is an eBay.ca shipping service. Use an eBay.com code in .env (EBAY_SHIP_US_SERVICE, EBAY_SHIP_CA_SERVICE, EBAY_SHIP_INTL_SERVICE).")
+    for on, code in ((sh.ca, s.ship_ca_service), (sh.us, s.ship_us_service), (sh.intl, s.ship_intl_service)):
+        if on and not code.startswith("CA_"):
+            raise EbayError(f"{code} is not an eBay.ca shipping service. Use a CA_ code in .env (EBAY_SHIP_CA_SERVICE, EBAY_SHIP_US_SERVICE, EBAY_SHIP_INTL_SERVICE).")
     options = []
-    if sh.us:
-        svc = {"sortOrder": 1, "shippingServiceCode": s.ship_us_service,
-               "freeShipping": False, "shippingCost": money(sh.us_cost)}
-        options.append({"optionType": "DOMESTIC", "costType": "FLAT_RATE", "shippingServices": [svc]})
-    abroad = []
     if sh.ca:
-        abroad.append({"shippingServiceCode": s.ship_ca_service, "shippingCost": money(sh.ca_cost),
-                       "shipToLocations": {"regionIncluded": [{"regionName": "CA"}]}})
+        svc = {"sortOrder": 1, "shippingServiceCode": s.ship_ca_service,
+               "freeShipping": False, "shippingCost": money(sh.ca_cost)}
+        options.append({"optionType": "DOMESTIC", "costType": "FLAT_RATE", "shippingServices": [svc]})
+    # eIS is an account-level setting on eBay.ca, so the policy carries no eIS field. These are seller-shipped extras.
+    abroad = []
+    if sh.us:
+        abroad.append({"shippingServiceCode": s.ship_us_service, "shippingCost": money(sh.us_cost),
+                       "shipToLocations": {"regionIncluded": [{"regionName": "US"}]}})
     if sh.intl:
         abroad.append({"shippingServiceCode": s.ship_intl_service, "shippingCost": money(sh.intl_cost),
                        "shipToLocations": {"regionIncluded": [{"regionName": "Worldwide"}]}})
@@ -233,8 +234,8 @@ class Ebay:
         raise EbayError(f"eBay {what} failed ({r.status_code}): {msg or r.text[:200]}")
 
     def call(self, method: str, path: str, what: str, *, ok404: bool = False, **kw):
-        headers = {"Authorization": f"Bearer {self.user_token()}", "Content-Language": "en-US",
-                   "Accept-Language": "en-US"}
+        headers = {"Authorization": f"Bearer {self.user_token()}", "Content-Language": self.s.content_language,
+                   "Accept-Language": self.s.content_language}
         r = self.http.request(method, self.s.api_base + path, headers=headers, **kw)
         if ok404 and r.status_code == 404:
             return None

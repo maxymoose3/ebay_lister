@@ -62,8 +62,8 @@ def check_options(o: ListingOptions, now: datetime | None = None) -> None:
     sh = o.shipping
     if not (sh.ca or sh.us or sh.intl or sh.local_pickup):
         raise ValueError("Choose at least one shipping option.")
-    if not sh.us and (sh.ca or sh.intl):
-        raise ValueError("eBay.com needs a US shipping option alongside Canadian or international shipping.")
+    if not sh.ca and (sh.us or sh.intl):
+        raise ValueError("eBay.ca needs a Canada shipping option alongside US or international shipping.")
     if o.start_time is None:
         return
     if o.start_time.tzinfo is None:

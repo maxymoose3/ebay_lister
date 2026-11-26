@@ -39,9 +39,11 @@ class Settings:
     client_id: str = field(default_factory=lambda: _s("EBAY_CLIENT_ID"))
     client_secret: str = field(default_factory=lambda: _s("EBAY_CLIENT_SECRET"))
     runame: str = field(default_factory=lambda: _s("EBAY_RUNAME"))
-    # Listings go on eBay.com, so "domestic" shipping means to the US.
-    marketplace: str = "EBAY_US"
-    currency: str = "USD"
+    # Listings go on eBay.ca, so "domestic" shipping means within Canada. eBay International Shipping (eIS)
+    # is an account setting on eBay.ca, not part of the listing: when enrolled, buyers abroad are served through it.
+    marketplace: str = "EBAY_CA"
+    currency: str = "CAD"
+    content_language: str = "en-CA"
     timezone: str = field(default_factory=lambda: _s("LISTER_TIMEZONE", "America/Vancouver"))
     include_subtitle: bool = field(default_factory=lambda: _b("EBAY_INCLUDE_SUBTITLE"))
 
@@ -51,14 +53,15 @@ class Settings:
     location_province: str = field(default_factory=lambda: _s("EBAY_LOCATION_PROVINCE", "BC"))
     location_postal: str = field(default_factory=lambda: _s("EBAY_LOCATION_POSTAL"))
 
-    # Shipping defaults (USD). eBay.com service codes, for items sent from Canada.
+    # Shipping defaults (CAD). eBay.ca service codes (they start with CA_). With eIS, Canada shipping is what
+    # you pay to reach the eIS hub; US and International are only for shipping abroad yourself, outside eIS.
     handling_days: int = field(default_factory=lambda: int(_f("EBAY_HANDLING_DAYS", 1)))
-    ship_ca_service: str = field(default_factory=lambda: _s("EBAY_SHIP_CA_SERVICE", "StandardInternational"))
-    ship_ca_cost: float = field(default_factory=lambda: _f("EBAY_SHIP_CA_COST", 12.5))
-    ship_us_service: str = field(default_factory=lambda: _s("EBAY_SHIP_US_SERVICE", "StandardShippingFromOutsideUS"))
-    ship_us_cost: float = field(default_factory=lambda: _f("EBAY_SHIP_US_COST", 17.5))
-    ship_intl_service: str = field(default_factory=lambda: _s("EBAY_SHIP_INTL_SERVICE", "OtherInternational"))
-    ship_intl_cost: float = field(default_factory=lambda: _f("EBAY_SHIP_INTL_COST", 17.5))
+    ship_ca_service: str = field(default_factory=lambda: _s("EBAY_SHIP_CA_SERVICE", "CA_PostExpeditedParcel"))
+    ship_ca_cost: float = field(default_factory=lambda: _f("EBAY_SHIP_CA_COST", 18.0))
+    ship_us_service: str = field(default_factory=lambda: _s("EBAY_SHIP_US_SERVICE", "CA_PostTrackedPacketsUSA"))
+    ship_us_cost: float = field(default_factory=lambda: _f("EBAY_SHIP_US_COST", 25.0))
+    ship_intl_service: str = field(default_factory=lambda: _s("EBAY_SHIP_INTL_SERVICE", "CA_PostTrackedPacketsInternational"))
+    ship_intl_cost: float = field(default_factory=lambda: _f("EBAY_SHIP_INTL_COST", 25.0))
 
     # Existing business policies (optional)
     fulfillment_policy_id: str = field(default_factory=lambda: _s("EBAY_FULFILLMENT_POLICY_ID"))

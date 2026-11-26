@@ -48,7 +48,7 @@ function optsForm(o){const sh=o.shipping,f={};const num=(k,st)=>f[k]=el('input',
  f.start=el('input',{type:'datetime-local',value:toLocal(o.start_time)});f.dur=el('select',{},...[1,3,5,7,10].map(d=>el('option',{value:d},d+' days')));f.dur.value=o.duration_days;
  const L=(...k)=>el('label',{},...k),au=L('Length ',f.dur),bo=L(chk('best_offer',o),'Best Offer');const vis=()=>{au.hidden=f.format.value!=='AUCTION';au.style.display=au.hidden?'none':'';bo.style.display=f.format.value==='AUCTION'?'none':''};
  const node=el('div',{},el('div',{className:'row'},L('Format ',f.format),L('Start ',f.start),el('span',{className:'mute small'},S.timezone+'; blank = when published'),au,bo),
- el('div',{className:'row',style:'margin-top:10px'},'Shipping ('+S.currency+')',L(chk('us',sh),'US ',num('us_cost')),L(chk('ca',sh),'Canada ',num('ca_cost')),L(chk('intl',sh),'International ',num('intl_cost')),
+ el('div',{className:'row',style:'margin-top:10px'},'Shipping ('+S.currency+')',L(chk('ca',sh),'Canada ',num('ca_cost')),L(chk('us',sh),'US, you ship ',num('us_cost')),L(chk('intl',sh),'International, you ship ',num('intl_cost')),
  L(chk('local_pickup',sh),'Local pickup'),L('Handling days ',num('handling_days','1'))));f.format.onchange=vis;vis();
  return{node,read:()=>({format:f.format.value,start_time:fromLocal(f.start.value),duration_days:+f.dur.value,best_offer:f.best_offer.checked,shipping:{ca:f.ca.checked,ca_cost:+f.ca_cost.value,us:f.us.checked,us_cost:+f.us_cost.value,intl:f.intl.checked,intl_cost:+f.intl_cost.value,local_pickup:f.local_pickup.checked,handling_days:+f.handling_days.value}})}}
 let mainOpts;

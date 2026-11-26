@@ -17,6 +17,7 @@ def test_start_time(delta, ok):
             check_options(o, now)
 
 
-def test_us_shipping_required():
+def test_canada_shipping_required_for_shipping_abroad():
     with pytest.raises(ValueError):
-        check_options(ListingOptions(shipping=Shipping(us=False)))
+        check_options(ListingOptions(shipping=Shipping(ca=False, us=True)))
+    check_options(ListingOptions(shipping=Shipping()))

@@ -56,14 +56,17 @@ class IdentifiedBatch(BaseModel):
 
 
 class Shipping(BaseModel):
-    """Flat-rate shipping in the listing currency. A destination that is off is not offered."""
+    """Flat-rate shipping in the listing currency (CAD). Canada is domestic on eBay.ca.
 
-    us: bool = True
-    us_cost: float = Field(17.5, ge=0)
+    US and International are seller-shipped options, off by default so eBay International Shipping serves
+    buyers abroad. A destination that is off is not offered by the seller."""
+
     ca: bool = True
-    ca_cost: float = Field(12.5, ge=0)
+    ca_cost: float = Field(18.0, ge=0)
+    us: bool = False
+    us_cost: float = Field(25.0, ge=0)
     intl: bool = False
-    intl_cost: float = Field(17.5, ge=0)
+    intl_cost: float = Field(25.0, ge=0)
     local_pickup: bool = False
     handling_days: int = Field(1, ge=0, le=30)
 

@@ -22,8 +22,8 @@ CHARMANDER = make(name="Charmander", card_number="038", set_name="Mega Evolution
 def settings(tmp_path):
     s = Settings(photos_dir=tmp_path / "photos", data_dir=tmp_path / "data", token_file=tmp_path / "tok.json",
                  state_file=tmp_path / "state.json")
-    s.client_id, s.client_secret, s.runame, s.currency, s.marketplace = "id", "secret", "ru", "USD", "EBAY_US"
+    s.client_id, s.client_secret, s.runame, s.currency, s.marketplace = "id", "secret", "ru", "CAD", "EBAY_CA"
     s.fulfillment_policy_id = s.return_policy_id = s.payment_policy_id = ""
     s.include_subtitle, s.ebay_env, s.auction_start = False, "production", 20.0
-    s.ship_us_service, s.ship_ca_service, s.ship_intl_service = "StandardShippingFromOutsideUS", "StandardInternational", "OtherInternational"
+    s.ship_ca_service, s.ship_us_service, s.ship_intl_service = "CA_PostExpeditedParcel", "CA_PostTrackedPacketsUSA", "CA_PostTrackedPacketsInternational"
     return s

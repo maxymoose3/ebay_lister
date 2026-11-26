@@ -38,7 +38,7 @@ def test_scheduled_auction_offer(settings):
     o = ListingOptions(format="AUCTION", duration_days=5, start_time=datetime.fromisoformat("2026-11-29T18:00:00-08:00"))
     b = offer_payload(draft(options=o, price_override=None), {}, settings)
     assert b["listingStartDate"] == "2026-11-30T02:00:00Z" and b["listingDuration"] == "DAYS_5"
-    assert b["pricingSummary"] == {"auctionStartPrice": {"value": "20.00", "currency": "USD"}}
+    assert b["pricingSummary"] == {"auctionStartPrice": {"value": "20.00", "currency": "CAD"}}
     assert "availableQuantity" not in b and "bestOfferTerms" not in b["listingPolicies"]
 
 
@@ -51,25 +51,30 @@ def test_fixed_price_offer(settings):
 
 
 def test_shipping_is_not_added_to_price(settings):
-    o = ListingOptions(shipping=Shipping(us_cost=17.5))
+    o = ListingOptions(shipping=Shipping(ca_cost=18))
     assert offer_payload(draft(options=o, price_override=100), {}, settings)["pricingSummary"]["price"]["value"] == "100.00"
     a = offer_payload(draft(options=o.model_copy(update={"format": "AUCTION"}), price_override=None), {}, settings)
     assert a["pricingSummary"]["auctionStartPrice"]["value"] == "20.00"
 
 
 def test_shipping_and_html(settings):
-    b = fulfillment_payload(Shipping(intl=True), settings)
+    b = fulfillment_payload(Shipping(us=True, intl=True), settings)
     dom, intl = b["shippingOptions"]
-    assert not dom["shippingServices"][0]["freeShipping"] and dom["shippingServices"][0]["shippingCost"]["value"] == "17.50"
-    assert dom["shippingServices"][0]["shippingServiceCode"] == "StandardShippingFromOutsideUS"
-    assert [x["shipToLocations"]["regionIncluded"][0]["regionName"] for x in intl["shippingServices"]] == ["CA", "Worldwide"]
-    assert b["marketplaceId"] == "EBAY_US"
+    assert not dom["shippingServices"][0]["freeShipping"] and dom["shippingServices"][0]["shippingCost"] == {"value": "18.00", "currency": "CAD"}
+    assert dom["shippingServices"][0]["shippingServiceCode"] == "CA_PostExpeditedParcel"
+    assert [x["shipToLocations"]["regionIncluded"][0]["regionName"] for x in intl["shippingServices"]] == ["US", "Worldwide"]
+    assert b["marketplaceId"] == "EBAY_CA"
     assert [x["sortOrder"] for x in intl["shippingServices"]] == [1, 2] and len(b["name"]) <= 64
     assert description_html("Hi\n- a <b>") == "<p>Hi</p><ul><li>a &lt;b&gt;</li></ul>"
 
 
-def test_ebay_ca_codes_are_rejected(settings):
-    settings.ship_us_service = "CA_PostTrackedPacketsUSA"
+def test_default_shipping_is_canada_only_for_eis(settings):
+    b = fulfillment_payload(Shipping(), settings)
+    assert [o["optionType"] for o in b["shippingOptions"]] == ["DOMESTIC"]
+
+
+def test_ebay_com_codes_are_rejected(settings):
+    settings.ship_ca_service = "StandardInternational"
     with pytest.raises(EbayError):
         fulfillment_payload(Shipping(), settings)
 

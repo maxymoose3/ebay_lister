@@ -2,12 +2,15 @@
 
 Status as of November 23, 2026. Run every command from the project folder.
 
+**Update, November 26, 2026 (later):** listings moved from eBay.com (USD) to eBay.ca (CAD) so eBay International
+Shipping can be used. Sections below are updated to match.
+
 **Update, November 26, 2026:** market research and automatic pricing were removed. You enter prices yourself, and Pokemon cards
 get a fixed title format (see README). Sections below are updated to match; the test status table is as of November 23.
 
 ## What is built
 
-A local app (web page and command line) that turns photos into eBay.com listing drafts.
+A local app (web page and command line) that turns photos into eBay.ca listing drafts.
 
 | Stage | What it does |
 |---|---|
@@ -18,10 +21,11 @@ A local app (web page and command line) that turns photos into eBay.com listing 
 
 ### Settings in place
 
-- eBay.com (`EBAY_US`), USD, items sent from Squamish, BC.
+- eBay.ca (`EBAY_CA`), CAD, items sent from Squamish, BC.
+- eBay International Shipping (eIS) for buyers outside Canada. This is an account setting, not part of each listing (see step 4).
 - No returns. Times are America/Vancouver.
 - Auctions start at $20 unless you enter another start price. You enter Buy It Now prices.
-- Flat shipping: US $17.50, Canada $12.50, International $17.50 (off by default).
+- Flat shipping (CAD): Canada $18 (on). US $25 and International $25 are off, so eIS handles those buyers.
 
 ### What has and has not been tested
 
@@ -70,12 +74,14 @@ Not needed for drafting; you can use **Copy listing** and paste into eBay yourse
    deletion notifications before the keys work.
 2. Create a RuName under User Tokens.
 3. Fill in `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `EBAY_RUNAME` and `EBAY_LOCATION_POSTAL` in `.env`.
-4. Make sure your eBay account can sell on eBay.com and is opted in to business policies.
+4. Make sure your eBay account is opted in to business policies, and check eIS under My eBay > Account > Shipping preferences.
+   eBay enrols eligible eBay.ca sellers automatically; if it shows as opted out, opt back in there.
 5. Run `.venv/bin/python ebay_lister.py auth`, sign in, and paste back the full address you land on. Do this promptly; the code expires.
 6. Run `.venv/bin/python ebay_lister.py shipping-services` and confirm these codes are listed:
-   `StandardShippingFromOutsideUS`, `StandardInternational`, `OtherInternational`. Change them in `.env` if not.
+   `CA_PostExpeditedParcel`, `CA_PostTrackedPacketsUSA`, `CA_PostTrackedPacketsInternational`. Change them in `.env` if not
+   (`EBAY_SHIP_CA_SERVICE`, `EBAY_SHIP_US_SERVICE`, `EBAY_SHIP_INTL_SERVICE`; eBay.ca codes start with `CA_`).
 
-The app creates its own shipping, payment and no-returns policies on the first send. To use existing **eBay.com** policies instead,
+The app creates its own shipping, payment and no-returns policies on the first send. To use existing **eBay.ca** policies instead,
 set the `EBAY_..._POLICY_ID` values. A fixed shipping policy ID overrides the per-item shipping options.
 
 ### 5. Send one listing, then publish
@@ -83,14 +89,16 @@ set the `EBAY_..._POLICY_ID` values. A fixed shipping policy ID overrides the pe
 1. Choose a low-value item and click **Send to eBay (not live)**. The result will not appear under Seller Hub drafts.
 2. If eBay reports an error, note the exact message; this is the first real test of this step.
 3. Check title, price, category, condition and start time in the app, then **Publish…** and confirm.
-4. Open the live listing and check photos, shipping to the US and Canada, returns and item location before sending more.
+4. Open the live listing and check photos, shipping within Canada, that a US buyer sees eIS shipping, returns and item location before sending more.
 
 ## Decisions for you
 
-- [ ] **Shipping rates.** $17.50 / $12.50 / $17.50 are your old CAD rates converted (25 / 18 / 25 at about 1.437), not current postage.
-      Check actual cost, including any duties or brokerage on parcels to the US.
-- [ ] **eBay International Shipping.** Sources found say it covers Canadian sellers only on eBay.ca. If you rely on it, confirm with eBay.
-- [ ] **$20 starts.** Fine for the cheaper cards. Consider a higher start or Buy It Now for valuable ones.
+- [ ] **Shipping rates.** CAD 18 / 25 / 25 are your old rates, not current postage. With eIS, the Canada rate also covers
+      sending to the Mississauga hub.
+- [ ] **eBay International Shipping.** Confirm your account is enrolled (step 4). eIS covers eBay.ca listings only.
+- [ ] **Categories and card conditions on eBay.ca.** Category IDs and card condition descriptors were written for eBay.com
+      and have not been checked against eBay.ca. The first send will show whether eBay.ca accepts them.
+- [ ] **$20 starts.** Now CAD 20, which is lower than the old USD 20. Fine for the cheaper cards. Consider a higher start or Buy It Now for valuable ones.
 
 ## Known limits
 
