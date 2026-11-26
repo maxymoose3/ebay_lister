@@ -31,8 +31,8 @@ class Settings:
     token_file: Path = ROOT / ".ebay_tokens.json"
     state_file: Path = ROOT / ".ebay_state.json"
 
-    # Claude
-    model: str = field(default_factory=lambda: _s("LISTER_MODEL", "claude-opus-5-5"))
+    # Gemini, for photo ID and listing text
+    model: str = field(default_factory=lambda: _s("LISTER_MODEL", "gemini-3.8-flash"))
 
     # eBay
     ebay_env: str = field(default_factory=lambda: _s("EBAY_ENV", "production"))

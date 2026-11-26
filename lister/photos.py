@@ -1,11 +1,10 @@
 """Photo loading: HEIC support, orientation, resizing and metadata removal.
 
-Phone photos carry GPS coordinates. Everything leaving this machine (to Claude or
+Phone photos carry GPS coordinates. Everything leaving this machine (to Gemini or
 eBay) goes through `jpeg_bytes`, which re-encodes pixels only.
 """
 from __future__ import annotations
 
-import base64
 import io
 import re
 from pathlib import Path
@@ -15,7 +14,7 @@ from pillow_heif import register_heif_opener
 
 register_heif_opener()
 EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
-CLAUDE_MAX = 1568
+ID_MAX = 1568  # long side sent to the photo-ID model
 EBAY_MAX = 2400
 
 
@@ -61,7 +60,3 @@ def jpeg_bytes(path: Path, max_side: int, quality: int = 88) -> bytes:
     clean.save(buf, "JPEG", quality=quality)
     return buf.getvalue()
 
-
-def claude_block(path: Path) -> dict:
-    data = base64.standard_b64encode(jpeg_bytes(path, CLAUDE_MAX)).decode()
-    return {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": data}}

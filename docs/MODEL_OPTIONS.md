@@ -1,7 +1,8 @@
 # Model options
 
 **Update, November 26, 2026:** market research and automatic pricing were removed from the app, so the research
-sections below are background only. Claude is still used for photo ID and listing text.
+sections below are background only. Claude is no longer used: photo ID and listing text
+both use Gemini Flash (`lister/llm.py`).
 
 Findings from the chat on November 24, 2026: whether to use Claude for market research, and whether free models could replace it.
 

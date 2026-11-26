@@ -2,15 +2,25 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 
 Category = Literal["trading_card", "sealed_product", "video_game"]
 
 
+def _blank_to_none(v):
+    return None if v == "" else v
+
+
+# A choice that may not apply. Gemini rejects "" as an enum value, so "not applicable" is null;
+# "" (from the UI or older saved drafts) is still accepted and read as null.
+def Choice(*values: str):
+    return Annotated[Optional[Literal[values]], BeforeValidator(_blank_to_none)]
+
+
 class Identification(BaseModel):
-    """What the photos show. Filled in by Claude, editable by the seller."""
+    """What the photos show. Filled in by the photo-ID model, editable by the seller."""
 
     category: Category
     photos: list[str] = Field(description="File names of every photo of this one physical item, best front photo first.")
@@ -27,14 +37,14 @@ class Identification(BaseModel):
     grade: str = Field(description="Number only, e.g. 10, 9.5. '' if not graded.")
     grade_label: str = Field(description="Label wording, e.g. GEM MINT, PRISTINE, MINT.")
     cert_number: str = Field(description="Only if legible in a photo or report; never guessed.")
-    raw_condition: Literal["", "near_mint", "lightly_played", "moderately_played", "heavily_played"] = Field(
-        description="Ungraded cards only.")
+    raw_condition: Choice("near_mint", "lightly_played", "moderately_played", "heavily_played") = Field(
+        None, description="Ungraded cards only; null otherwise.")
     product_type: str = Field(description="Sealed product: Booster Box, Elite Trainer Box, Tin, Booster Pack ...")
     platform: str = Field(description="Video games: Nintendo Switch, PS2, Game Boy Advance ...")
     region: str = Field(description="Video games: NTSC, PAL, NTSC-J. '' if unknown.")
-    completeness: Literal["", "loose", "complete", "sealed"] = Field(description="Video games only.")
-    game_condition: Literal["", "like_new", "very_good", "good", "acceptable"] = Field(
-        description="Opened video games only.")
+    completeness: Choice("loose", "complete", "sealed") = Field(None, description="Video games only; null otherwise.")
+    game_condition: Choice("like_new", "very_good", "good", "acceptable") = Field(
+        None, description="Opened video games only; null otherwise.")
     condition_notes: str = Field(description="Only flaws or facts visible in the photos.")
     confidence: Literal["high", "medium", "low"]
     uncertainties: list[str] = Field(description="Anything the seller must confirm.")

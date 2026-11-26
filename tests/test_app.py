@@ -119,7 +119,7 @@ def test_long_pokemon_title_drops_label_then_shortens_set():
     assert len(t) <= 80 and t.startswith("2019 Pokemon Sword") and t.endswith("Umbreon VMAX Alternate Art 38/236 TAG 10")
 
 
-def test_draft_survives_missing_claude(ctx, monkeypatch):
+def test_draft_survives_missing_llm(ctx, monkeypatch):
     c, pipe = ctx
 
     def boom(*a):

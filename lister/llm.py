@@ -1,57 +1,56 @@
-"""Thin wrapper around the Anthropic SDK."""
+"""Thin wrapper around the Google Gen AI SDK (Gemini), used for photo ID and listing text."""
 from __future__ import annotations
 
 from typing import TypeVar
 
-import anthropic
+from google import genai
+from google.genai import errors, types
 from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
-# If a request is declined by a safety classifier, let the API retry it on another model.
-FALLBACK = {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
 
 
 class LLMError(RuntimeError):
     pass
 
 
-def client() -> anthropic.Anthropic:
-    return anthropic.Anthropic()
+def image(jpeg: bytes) -> types.Part:
+    return types.Part.from_bytes(data=jpeg, mime_type="image/jpeg")
 
 
 def explain(e: Exception) -> str:
-    if isinstance(e, anthropic.AuthenticationError):
-        return "Claude rejected the credentials. Check ANTHROPIC_API_KEY in .env."
-    if isinstance(e, anthropic.RateLimitError):
-        return "Claude rate limit reached. Wait a minute and retry."
-    if isinstance(e, anthropic.APIStatusError):
-        return f"Claude API error {e.status_code}: {e.message}"
-    if isinstance(e, anthropic.APIConnectionError):
-        return "Could not reach the Claude API."
-    if isinstance(e, anthropic.AnthropicError) or "authentication method" in str(e):
-        return "No Claude credentials found. Set ANTHROPIC_API_KEY in .env."
-    return str(e)
+    if isinstance(e, errors.APIError):
+        if e.code in (401, 403):
+            return "Gemini rejected the credentials. Check GEMINI_API_KEY in .env."
+        if e.code == 429:
+            return "Gemini rate limit reached. Wait a minute and retry."
+        return f"Gemini API error {e.code}: {e.message}"
+    if isinstance(e, ValueError) and "api key" in str(e).lower():
+        return "No Gemini credentials found. Set GEMINI_API_KEY in .env."
+    return f"Could not reach the Gemini API: {e}"
 
 
-def check_stop(resp) -> None:
-    if resp.stop_reason == "refusal":
-        raise LLMError("Claude declined this request.")
-    if resp.stop_reason == "max_tokens":
-        raise LLMError("Claude's answer was cut off; try fewer photos at once.")
-
-
-def structured(model: str, system: str, content, schema: type[T], *, effort: str, max_tokens: int = 32000) -> T:
+def structured(model: str, system: str, content: list | str, schema: type[T], *, thinking: str = "high") -> T:
     """One call that returns a validated `schema` instance."""
     try:
-        with client().beta.messages.stream(
-            model=model, max_tokens=max_tokens, system=system,
-            messages=[{"role": "user", "content": content}],
-            output_config={"effort": effort}, output_format=schema, **FALLBACK,
-        ) as stream:
-            resp = stream.get_final_message()
-    except (anthropic.AnthropicError, TypeError) as e:
+        # Keep a reference for the whole call: the SDK closes its HTTP client when the
+        # Client object is garbage-collected, so `genai.Client().models...` can fail mid-call.
+        with genai.Client() as client:
+            resp = client.models.generate_content(
+                model=model, contents=content,
+                config=types.GenerateContentConfig(
+                    system_instruction=system, response_mime_type="application/json", response_schema=schema,
+                    thinking_config=types.ThinkingConfig(thinking_level=thinking),
+                ),
+            )
+    except Exception as e:  # SDK raises APIError, ValueError (no key) or httpx errors
         raise LLMError(explain(e)) from e
-    check_stop(resp)
-    if resp.parsed_output is None:
-        raise LLMError("Claude returned no structured result.")
-    return resp.parsed_output
+    cand = resp.candidates[0] if resp.candidates else None
+    reason = cand.finish_reason if cand else None
+    if reason == types.FinishReason.MAX_TOKENS:
+        raise LLMError("Gemini's answer was cut off; try fewer photos at once.")
+    if reason in (types.FinishReason.SAFETY, types.FinishReason.PROHIBITED_CONTENT) or not cand:
+        raise LLMError("Gemini declined this request.")
+    if not isinstance(resp.parsed, schema):
+        raise LLMError("Gemini returned no structured result.")
+    return resp.parsed

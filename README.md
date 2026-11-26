@@ -8,7 +8,7 @@ eBay International Shipping (eIS) when your account is enrolled. For trading car
 ```sh
 uv venv --python 3.11 .venv
 uv pip install --python .venv/bin/python -r requirements-dev.txt
-echo "ANTHROPIC_API_KEY=your-key" > .env
+echo "GEMINI_API_KEY=your-key" > .env   # Gemini Flash: photo ID and listing text
 .venv/bin/python ebay_lister.py serve
 ```
 
@@ -31,7 +31,7 @@ From the terminal: `ebay_lister.py draft IMG_2825.jpg IMG_2826.jpg --auction --s
 
 Pokemon cards get a fixed title format: `{year} Pokemon {set} {card name} {card number}`, then `{grader} {grade} {label}` if graded,
 for example `2019 Pokemon Cosmic Eclipse Blastoise & Piplup GX 38/236 TAG 10 Gem Mint`. Blank fields are left out. If the title
-is over 80 characters, the label wording is dropped first, then the set name is shortened. Other items get a title written by Claude.
+is over 80 characters, the label wording is dropped first, then the set name is shortened. Other items get a title written by Gemini.
 
 ## Prices
 

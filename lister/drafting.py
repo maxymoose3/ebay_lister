@@ -23,11 +23,11 @@ Never state a price. For ungraded items do not predict a grade."""
 
 def write(item: Identification, model: str) -> ListingText:
     facts = item.model_dump_json(exclude={"photos", "reference_photos", "confidence", "uncertainties"}, indent=1)
-    return tidy(llm.structured(model, SYSTEM, f"Facts:\n{facts}", ListingText, effort="low"), item)
+    return tidy(llm.structured(model, SYSTEM, f"Facts:\n{facts}", ListingText, thinking="low"), item)
 
 
 def template(item: Identification) -> ListingText:
-    """Plain fallback when Claude is unavailable."""
+    """Plain fallback when Gemini is unavailable."""
     grade = f"{item.grader} {item.grade} {item.grade_label.title()}".strip() if item.graded else ""
     if item.category == "trading_card":
         bits = [item.franchise, item.name, item.card_number, item.set_name, item.rarity, grade, item.year]

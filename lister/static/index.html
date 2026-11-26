@@ -66,7 +66,7 @@ function draft(d){const busy=pending[d.id],it=d.item,auction=d.options.format===
  const ov=el('input',{type:'number',step:'0.01',min:'0.01',value:d.price_override??'',placeholder:auction?'start price':'price','aria-label':auction?'Auction start price':'Buy It Now price'});
  // item + options
  const ids=['name','set_name','card_number','year','language','rarity','grader','grade','grade_label','cert_number','product_type','platform','region','condition_notes'],inp={};
- const pick=(k,vals)=>{inp[k]=el('select',{},...vals.map(v=>el('option',{value:v},v||'—')));inp[k].value=it[k];return inp[k]};
+ const pick=(k,vals)=>{inp[k]=el('select',{},...vals.map(v=>el('option',{value:v},v||'—')));inp[k].value=it[k]??'';return inp[k]};
  const of=optsForm(d.options);
  const editor=el('details',{},el('summary',{},'Item details and options'),el('div',{className:'row',style:'margin:8px 0'},...ids.map(k=>el('label',{className:'small'},k.replace('_',' ')+' ',inp[k]=el('input',{value:it[k],size:14}))),
  el('label',{className:'small'},'category ',pick('category',['trading_card','sealed_product','video_game'])),el('label',{className:'small'},'card condition ',pick('raw_condition',['','near_mint','lightly_played','moderately_played','heavily_played'])),

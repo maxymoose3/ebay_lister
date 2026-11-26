@@ -15,7 +15,7 @@ A local app (web page and command line) that turns photos into eBay.ca listing d
 | Stage | What it does |
 |---|---|
 | Photos | Reads JPG, PNG, WebP and HEIC. Removes GPS and other metadata before a photo leaves this Mac. |
-| Identify | Claude groups photos into items and reads name, set, number, grade, cert, platform and so on. You can correct any field. |
+| Identify | Gemini Flash (`gemini-3.8-flash`, override with `LISTER_MODEL`) groups photos into items and reads name, set, number, grade, cert, platform and so on. You can correct any field. |
 | Draft | Title (80 characters max; fixed format for Pokemon cards), concise description, item specifics, eBay condition and category. You enter the price. |
 | eBay | Uploads photos and creates an **unpublished** offer. Publishing is a separate step you confirm for each listing. |
 
@@ -31,18 +31,20 @@ A local app (web page and command line) that turns photos into eBay.ca listing d
 
 | | Status |
 |---|---|
-| Automated tests | 22 pass, with Claude and eBay simulated (after the November 26 change) |
+| Automated tests | 28 pass, with Gemini and eBay simulated (after the switch to Gemini) |
 | Web page | Rendered at desktop and phone width; not clicked through by hand |
-| Claude: identification, descriptions | **Never run live** (no API key yet) |
+| Gemini: identification, descriptions | **Never run live** (no API key yet) |
 | eBay: sign-in, photo upload, offers, publishing | **Never run live** (no keys yet) |
 
 ## Next steps
 
-### 1. Set up the Claude key (required)
+### 1. Set up the Gemini key (required)
 
-1. Create a key at https://platform.claude.com/settings/keys.
+1. Create a key at https://aistudio.google.com/apikey.
 2. Create a file named `.env` in the project folder.
-3. Add the line `ANTHROPIC_API_KEY=your-key` to `.env`. This is billed per use; cost per item has not been measured, so check usage after the first few.
+3. Add the line `GEMINI_API_KEY=your-key` to `.env`. It is used for photo ID and listing text.
+
+This is billed per use; cost per item has not been measured, so check usage after the first few.
 
 The virtual environment already exists in `.venv`. Restart the app whenever `.env` changes.
 
