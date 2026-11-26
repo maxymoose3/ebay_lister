@@ -2,7 +2,7 @@
 """eBay listing automation.
 
   ebay_lister.py serve                   open the local app
-  ebay_lister.py draft PHOTO...          identify, research and draft from the terminal
+  ebay_lister.py draft PHOTO...          identify and draft from the terminal
   ebay_lister.py auth                    sign in to eBay
   ebay_lister.py shipping-services       list valid shipping service codes
 """
@@ -20,21 +20,15 @@ from lister.pipeline import Pipeline, check_options
 
 
 def show(d) -> None:
-    p = d.pricing
     print(f"\n{'=' * 78}\n{d.text.title if d.text else d.item.summary()}\n{'-' * 78}")
     if d.text:
         print(d.text.description, "\n")
     label = "Auction start" if d.options.format == "AUCTION" else "Buy It Now"
-    print(f"{label}: {f'{p.currency} {d.price:.2f}' if d.price else 'no price'}   "
-          f"market {p.market_value or '-'}   confidence {p.confidence}\n{p.basis}")
+    print(f"{label}: {f'{d.price:.2f}' if d.price else 'not set'}")
     if d.options.start_time:
         print(f"Starts: {d.options.start_time:%a %d %b %Y %H:%M %Z}")
-    for st in d.sources:
-        print(f"  {st.source}: {st.status} ({st.detail})")
-    for w in [*p.warnings, *d.item.uncertainties, *([d.error] if d.error else [])]:
+    for w in [*d.item.uncertainties, *([d.error] if d.error else [])]:
         print(f"  ! {w}")
-    for k, v in d.links.items():
-        print(f"  {k}: {v}")
     print(f"Draft {d.id}: {d.status}")
 
 
@@ -50,7 +44,7 @@ def main() -> int:
     dr.add_argument("--days", type=int, default=7, choices=[1, 3, 5, 7, 10], help="auction length")
     dr.add_argument("--no-canada", action="store_true")
     dr.add_argument("--intl", action="store_true")
-    dr.add_argument("--free-shipping", action="store_true", help="free to US buyers; cost goes into the Buy It Now price")
+    dr.add_argument("--price", type=float, help="Buy It Now price, or auction start (default: LISTER_AUCTION_START)")
     sub.add_parser("auth")
     sub.add_parser("shipping-services")
     a = ap.parse_args()
@@ -66,11 +60,14 @@ def main() -> int:
             o.format, o.duration_days = ("AUCTION" if a.auction else "FIXED_PRICE"), a.days
             if a.start:
                 o.start_time = datetime.fromisoformat(a.start).replace(tzinfo=ZoneInfo(pipe.s.timezone))
-            o.shipping.ca, o.shipping.intl, o.shipping.free_domestic = not a.no_canada, a.intl, a.free_shipping
+            o.shipping.ca, o.shipping.intl = not a.no_canada, a.intl
             check_options(o)
             drafts, left = pipe.identify([Path(p).name for p in a.photos], o)
             for d in drafts:
-                show(pipe.research(d.id))
+                if a.price:
+                    d.price_override = a.price
+                    pipe.store.save(d)
+                show(pipe.draft(d.id))
             if left:
                 print("\nNot matched to an item:", ", ".join(left))
         elif a.cmd == "auth":

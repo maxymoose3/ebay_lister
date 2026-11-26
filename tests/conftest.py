@@ -24,7 +24,6 @@ def settings(tmp_path):
                  state_file=tmp_path / "state.json")
     s.client_id, s.client_secret, s.runame, s.currency, s.marketplace = "id", "secret", "ru", "USD", "EBAY_US"
     s.fulfillment_policy_id = s.return_policy_id = s.payment_policy_id = ""
-    s.insights, s.include_subtitle, s.ebay_env = False, False, "production"
-    s.bin_markup, s.auction_start, s.pricecharting_token = 1.05, 20.0, ""
+    s.include_subtitle, s.ebay_env, s.auction_start = False, "production", 20.0
     s.ship_us_service, s.ship_ca_service, s.ship_intl_service = "StandardShippingFromOutsideUS", "StandardInternational", "OtherInternational"
     return s

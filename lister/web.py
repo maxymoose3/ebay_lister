@@ -12,9 +12,8 @@ from pydantic import BaseModel, Field
 
 from . import llm, photos
 from .ebay import EbayError
-from .models import Comp, Draft, Identification, ListingOptions, ListingText
+from .models import Draft, Identification, ListingOptions, ListingText
 from .pipeline import Pipeline, check_options
-from .research.links import query
 
 STATIC = Path(__file__).parent / "static"
 LOCAL_HOSTS = {"127.0.0.1", "localhost"}
@@ -33,23 +32,6 @@ class PatchIn(BaseModel):
     category_id: Optional[str] = None
     price_override: Optional[float] = Field(None, gt=0)
     clear_price_override: bool = False
-
-
-class PasteIn(BaseModel):
-    text: str = Field(max_length=200_000)
-    source: str = Field(max_length=40)
-    dollar_currency: str = Field(pattern="^[A-Z]{3}$")
-
-
-class ToggleIn(BaseModel):
-    included: bool
-
-
-class ManualIn(BaseModel):
-    title: str = ""
-    price: float = Field(gt=0)
-    currency: str = Field("USD", pattern="^[A-Z]{3}$")
-    date: Optional[str] = None
 
 
 class PublishIn(BaseModel):
@@ -86,7 +68,7 @@ def create_app(pipe: Pipeline | None = None) -> FastAPI:
             raise HTTPException(404, "Draft not found")
 
     def out(d: Draft) -> dict:
-        return d.model_dump(mode="json") | {"price": d.price, "search_text": query(d.item)}
+        return d.model_dump(mode="json") | {"price": d.price}
 
     def start(fn) -> dict:
         jid = uuid.uuid4().hex
@@ -148,21 +130,21 @@ def create_app(pipe: Pipeline | None = None) -> FastAPI:
             return {"drafts": [d.id for d in drafts], "unassigned": left}
         return start(work)
 
-    @app.post("/api/drafts/{id}/research")
-    def research(id: str):
+    @app.post("/api/drafts/{id}/draft")
+    def write_draft(id: str):
         d = get(id)
         check_options(d.options)
         if d.status == "published":
             raise ValueError("This draft is already live.")
-        return start(lambda: out(pipe.research(id)))
+        return start(lambda: out(pipe.draft(id)))
 
     @app.patch("/api/drafts/{id}")
     def patch(id: str, body: PatchIn):
         d = get(id)
         if d.status == "published":
             raise ValueError("This draft is already live; edit it on eBay.")
-        if d.status == "researching":
-            raise ValueError("Research is running; wait for it to finish.")
+        if d.status == "drafting":
+            raise ValueError("The draft is being written; wait for it to finish.")
         if body.options:
             check_options(body.options)
             if body.options.format != d.options.format:
@@ -186,32 +168,13 @@ def create_app(pipe: Pipeline | None = None) -> FastAPI:
             d.price_override = body.price_override
         if body.clear_price_override:
             d.price_override = None
-        return out(pipe.reprice(d))
+        return out(pipe.changed(d))
 
     @app.delete("/api/drafts/{id}")
     def delete(id: str):
         get(id)
         pipe.store.delete(id)
         return {"ok": True}
-
-    @app.post("/api/drafts/{id}/paste")
-    def paste(id: str, body: PasteIn):
-        get(id)
-        return start(lambda: out(pipe.add_pasted(id, body.text, body.source, body.dollar_currency)))
-
-    @app.post("/api/drafts/{id}/comps")
-    def manual(id: str, body: ManualIn):
-        d = get(id)
-        c = Comp(source="Entered by you (pasted)", kind="sold", title=body.title or d.item.summary(), price=body.price,
-                 currency=body.currency, date=body.date)
-        d = pipe.add_manual(id, c)
-        # The seller vouches for a comp typed by hand.
-        return out(pipe.toggle(id, d.comps[-1].id, True))
-
-    @app.post("/api/drafts/{id}/comps/{cid}")
-    def toggle(id: str, cid: str, body: ToggleIn):
-        get(id)
-        return out(pipe.toggle(id, cid, body.included))
 
     @app.post("/api/drafts/{id}/push")
     def push(id: str):

@@ -19,7 +19,6 @@ from .config import Settings
 from .models import Draft, Identification, Shipping
 
 BASE_SCOPE = "https://api.ebay.com/oauth/api_scope"
-INSIGHTS_SCOPE = BASE_SCOPE + "/buy.marketplace.insights"
 USER_SCOPES = [BASE_SCOPE, BASE_SCOPE + "/sell.inventory", BASE_SCOPE + "/sell.account"]
 
 CCG_SINGLES, SPORTS_SINGLES, SEALED_BOOSTERS, VIDEO_GAMES = "183454", "261328", "183456", "139973"
@@ -126,13 +125,7 @@ def offer_payload(d: Draft, policies: dict[str, str], s: Settings) -> dict:
     else:
         body |= {"listingDuration": "GTC", "availableQuantity": 1, "pricingSummary": {"price": amount}}
         if o.best_offer:
-            terms: dict = {"bestOfferEnabled": True}
-            # The thresholds were worked out for the suggested price; skip them when they no longer fit.
-            if d.pricing.auto_accept and d.pricing.auto_accept < price:
-                terms["autoAcceptPrice"] = {"value": f"{d.pricing.auto_accept:.2f}", "currency": s.currency}
-            if d.pricing.auto_decline and d.pricing.auto_decline < price:
-                terms["autoDeclinePrice"] = {"value": f"{d.pricing.auto_decline:.2f}", "currency": s.currency}
-            body["listingPolicies"]["bestOfferTerms"] = terms
+            body["listingPolicies"]["bestOfferTerms"] = {"bestOfferEnabled": True}
     if o.start_time:
         body["listingStartDate"] = o.start_time.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     return body
@@ -144,11 +137,11 @@ def fulfillment_payload(sh: Shipping, s: Settings) -> dict:
 
     for on, code in ((sh.us, s.ship_us_service), (sh.ca, s.ship_ca_service), (sh.intl, s.ship_intl_service)):
         if on and code.startswith("CA_"):
-            raise EbayError(f"{code} is an eBay.ca shipping service. Use an eBay.com code in .env (see .env.example).")
+            raise EbayError(f"{code} is an eBay.ca shipping service. Use an eBay.com code in .env (EBAY_SHIP_US_SERVICE, EBAY_SHIP_CA_SERVICE, EBAY_SHIP_INTL_SERVICE).")
     options = []
     if sh.us:
         svc = {"sortOrder": 1, "shippingServiceCode": s.ship_us_service,
-               "freeShipping": sh.free_domestic, "shippingCost": money(0 if sh.free_domestic else sh.us_cost)}
+               "freeShipping": False, "shippingCost": money(sh.us_cost)}
         options.append({"optionType": "DOMESTIC", "costType": "FLAT_RATE", "shippingServices": [svc]})
     abroad = []
     if sh.ca:
@@ -171,7 +164,6 @@ class Ebay:
     def __init__(self, s: Settings, transport: httpx.BaseTransport | None = None):
         self.s = s
         self.http = httpx.Client(timeout=60, transport=transport)
-        self._app: tuple[str, float] = ("", 0)
 
     # --- auth -----------------------------------------------------------
     def _basic(self) -> dict:
@@ -183,15 +175,6 @@ class Ebay:
     def _token(self, data: dict) -> dict:
         r = self.http.post(f"{self.s.api_base}/identity/v1/oauth2/token", headers=self._basic(), data=data)
         return self._json(r, "sign-in")
-
-    def app_token(self) -> str:
-        tok, exp = self._app
-        if time.time() < exp - 60:
-            return tok
-        scope = BASE_SCOPE + (f" {INSIGHTS_SCOPE}" if self.s.insights else "")
-        d = self._token({"grant_type": "client_credentials", "scope": scope})
-        self._app = (d["access_token"], time.time() + d["expires_in"])
-        return d["access_token"]
 
     def consent_url(self) -> str:
         if not (self.s.has_ebay_keys and self.s.runame):

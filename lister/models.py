@@ -64,7 +64,6 @@ class Shipping(BaseModel):
     ca_cost: float = Field(12.5, ge=0)
     intl: bool = False
     intl_cost: float = Field(17.5, ge=0)
-    free_domestic: bool = False  # free to US buyers
     local_pickup: bool = False
     handling_days: int = Field(1, ge=0, le=30)
 
@@ -75,40 +74,6 @@ class ListingOptions(BaseModel):
     duration_days: Literal[1, 3, 5, 7, 10] = 7
     best_offer: bool = True
     shipping: Shipping = Field(default_factory=Shipping)
-
-
-class Comp(BaseModel):
-    id: str = ""
-    source: str
-    kind: Literal["sold", "active", "guide"]
-    title: str
-    price: float
-    currency: str
-    price_local: Optional[float] = None  # converted to the listing currency
-    date: Optional[str] = None  # ISO date of sale
-    url: str = ""
-    included: bool = True
-    note: str = ""
-
-
-class SourceStatus(BaseModel):
-    source: str
-    status: Literal["ok", "empty", "skipped", "error"]
-    detail: str = ""
-
-
-class Pricing(BaseModel):
-    currency: str = "USD"
-    market_value: Optional[float] = None
-    low: Optional[float] = None
-    high: Optional[float] = None
-    list_price: Optional[float] = None  # Buy It Now
-    start_price: Optional[float] = None  # auction
-    auto_accept: Optional[float] = None
-    auto_decline: Optional[float] = None
-    confidence: Literal["high", "medium", "low", "none"] = "none"
-    basis: str = ""
-    warnings: list[str] = Field(default_factory=list)
 
 
 class ListingText(BaseModel):
@@ -124,19 +89,17 @@ class Draft(BaseModel):
     options: ListingOptions
     text: Optional[ListingText] = None
     aspects: dict[str, list[str]] = Field(default_factory=dict)
-    comps: list[Comp] = Field(default_factory=list)
-    sources: list[SourceStatus] = Field(default_factory=list)
-    pricing: Pricing = Field(default_factory=Pricing)
-    price_override: Optional[float] = None
-    links: dict[str, str] = Field(default_factory=dict)
+    price_override: Optional[float] = None  # the seller's price: Buy It Now price or auction start
+    default_start: Optional[float] = None  # auction start used when the seller sets none
     category_id: str = ""
-    status: Literal["identified", "researching", "ready", "error", "pushed", "published"] = "identified"
+    status: Literal["identified", "drafting", "ready", "error", "pushed", "published"] = "identified"
     error: str = ""
     offer_id: str = ""
     listing_id: str = ""
 
     @property
     def price(self) -> Optional[float]:
+        """The item price sent to eBay. Shipping is charged separately, through the shipping policy."""
         if self.price_override is not None:
             return self.price_override
-        return self.pricing.start_price if self.options.format == "AUCTION" else self.pricing.list_price
+        return self.default_start if self.options.format == "AUCTION" else None

@@ -1,16 +1,14 @@
-"""Photos -> items -> research -> priced draft."""
+"""Photos -> items -> listing drafts."""
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from . import drafting, llm, pricing
+from . import drafting, llm
 from .config import Settings
 from .ebay import Ebay, default_category
 from .identify import identify
-from .models import Comp, Draft, Identification, ListingOptions, Shipping
-from .research import pasted, run as research_run
-from .research.links import links
+from .models import Draft, Identification, ListingOptions, Shipping
 from .store import Store
 
 
@@ -27,26 +25,20 @@ class Pipeline:
 
     def create(self, item: Identification, opts: ListingOptions | None = None) -> Draft:
         d = Draft(id=uuid.uuid4().hex[:12], created=datetime.now(timezone.utc), item=item,
-                  options=opts or self.default_options(), links=links(item))
+                  options=opts or self.default_options(), default_start=round(self.s.auction_start, 2))
         return self.store.save(d)
 
     def identify(self, names: list[str], opts: ListingOptions | None = None) -> tuple[list[Draft], list[str]]:
         batch = identify(self.s.photos_dir, names, self.s.model)
         return [self.create(i, opts.model_copy(deep=True) if opts else None) for i in batch.items], batch.unassigned_photos
 
-    def research(self, id: str) -> Draft:
-        """Market research, price and text for one draft."""
+    def draft(self, id: str) -> Draft:
+        """Title, description, item specifics and category for one draft."""
         d = self.store.get(id)
         check_options(d.options)
-        d.status, d.error = "researching", ""
+        d.status, d.error = "drafting", ""
         self.store.save(d)
         try:
-            d.links = links(d.item)
-            kept = [c for c in d.comps if c.source.endswith("(pasted)")]
-            found, d.sources = research_run.run(d.item, self.s, self.ebay.app_token)
-            # Pasted comps keep the seller's include/exclude choices.
-            d.comps = found + [c for c in kept if c.id not in {f.id for f in found}]
-            d.pricing = pricing.price(d.comps, d.options, self.s)
             d.aspects = drafting.aspects(d.item)
             d.category_id = d.category_id or default_category(d.item)
             try:
@@ -59,27 +51,7 @@ class Pipeline:
             d.status, d.error = "error", f"{type(e).__name__}: {e}"[:400]
         return self.store.save(d)
 
-    def add_pasted(self, id: str, text: str, source: str, dollar_currency: str) -> Draft:
-        d = self.store.get(id)
-        new = research_run.finalize(d.item, pasted.parse(text, source, dollar_currency, self.s.model), self.s)
-        have = {c.id for c in d.comps}
-        d.comps += [c for c in new if c.id not in have]
-        return self.reprice(d)
-
-    def add_manual(self, id: str, comp: Comp) -> Draft:
-        d = self.store.get(id)
-        d.comps += research_run.finalize(d.item, [comp], self.s)
-        return self.reprice(d)
-
-    def toggle(self, id: str, comp_id: str, included: bool) -> Draft:
-        d = self.store.get(id)
-        for c in d.comps:
-            if c.id == comp_id:
-                c.included = included and c.price_local is not None
-        return self.reprice(d)
-
-    def reprice(self, d: Draft) -> Draft:
-        d.pricing = pricing.price(d.comps, d.options, self.s)
+    def changed(self, d: Draft) -> Draft:
         if d.status == "pushed":
             d.status = "ready"  # eBay still has the old version; it must be sent again before publishing
         return self.store.save(d)

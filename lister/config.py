@@ -33,14 +33,12 @@ class Settings:
 
     # Claude
     model: str = field(default_factory=lambda: _s("LISTER_MODEL", "claude-opus-5-5"))
-    web_search: bool = field(default_factory=lambda: _s("LISTER_WEB_SEARCH", "true").lower() != "false")
 
     # eBay
     ebay_env: str = field(default_factory=lambda: _s("EBAY_ENV", "production"))
     client_id: str = field(default_factory=lambda: _s("EBAY_CLIENT_ID"))
     client_secret: str = field(default_factory=lambda: _s("EBAY_CLIENT_SECRET"))
     runame: str = field(default_factory=lambda: _s("EBAY_RUNAME"))
-    insights: bool = field(default_factory=lambda: _b("EBAY_INSIGHTS_ENABLED"))
     # Listings go on eBay.com, so "domestic" shipping means to the US.
     marketplace: str = "EBAY_US"
     currency: str = "USD"
@@ -67,9 +65,7 @@ class Settings:
     return_policy_id: str = field(default_factory=lambda: _s("EBAY_RETURN_POLICY_ID"))
     payment_policy_id: str = field(default_factory=lambda: _s("EBAY_PAYMENT_POLICY_ID"))
 
-    # Research / pricing
-    pricecharting_token: str = field(default_factory=lambda: _s("PRICECHARTING_TOKEN"))
-    bin_markup: float = field(default_factory=lambda: _f("LISTER_BIN_MARKUP", 1.05))
+    # Pricing
     auction_start: float = field(default_factory=lambda: _f("LISTER_AUCTION_START", 20.0))
 
     @property

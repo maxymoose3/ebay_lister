@@ -1,6 +1,9 @@
 """Stage 3: title, description and item specifics."""
 from __future__ import annotations
 
+import re
+import unicodedata
+
 from . import llm
 from .models import Identification, ListingText
 
@@ -46,8 +49,45 @@ def clip(text: str, limit: int) -> str:
     return cut[:limit].rstrip(" -,|")
 
 
+def _plain(s: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c)).lower()
+
+
+def is_pokemon_card(item: Identification) -> bool:
+    return item.category == "trading_card" and "pokemon" in _plain(item.franchise)
+
+
+_ABBR = {"NM", "MT", "EX", "VG", "GD", "PR", "FR", "GM"}
+
+
+def grade_words(label: str) -> str:
+    """Slab label wording for a title: 'GEM MT' -> 'Gem Mint', 'NM-MT' stays 'NM-MT'."""
+    label = re.sub(r"\bGEM[\s-]+MT\b", "GEM MINT", " ".join(label.upper().split()))
+    return " ".join(w if all(p in _ABBR for p in w.split("-")) else w.capitalize() for w in label.split())
+
+
+def pokemon_title(item: Identification) -> str:
+    """{year} Pokemon {set} {card name} {number}, then {grader} {grade} {label} if graded."""
+    set_name = re.sub(r"^pok[eé]mon\s+", "", item.set_name.strip(), flags=re.I)
+    grade = [item.grader, item.grade] if item.graded else []
+
+    def build(set_part: str, label: str) -> str:
+        return " ".join(" ".join(b for b in [item.year, "Pokemon", set_part, item.name, item.card_number, *grade, label]
+                                 if b).split())
+
+    label = grade_words(item.grade_label) if item.graded else ""
+    for lab in (label, ""):  # drop the label wording before cutting into the set name
+        title = build(set_name, lab)
+        if len(title) <= TITLE_MAX:
+            return title
+    room = TITLE_MAX - len(build("", "")) - 1
+    return build(clip(set_name, room) if room > 0 else "", "")
+
+
 def tidy(t: ListingText, item: Identification) -> ListingText:
     title = " ".join(t.title.split())
+    if is_pokemon_card(item):
+        title = pokemon_title(item)
     if item.graded:
         # The grade must survive clipping.
         tail = f"{item.grader} {item.grade}"
