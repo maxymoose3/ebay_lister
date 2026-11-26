@@ -54,7 +54,14 @@ def main() -> int:
             import uvicorn
             from lister.web import create_app
             print(f"Open http://127.0.0.1:{a.port}")
-            uvicorn.run(create_app(pipe), host="127.0.0.1", port=a.port, log_level="warning")
+            try:
+                uvicorn.run(create_app(pipe), host="127.0.0.1", port=a.port, log_level="warning")
+            finally:
+                # Photos are per-session uploads; remove them when the app stops.
+                from lister.photos import EXTS
+                for f in pipe.s.photos_dir.glob("*"):
+                    if f.is_file() and f.suffix.lower() in EXTS:
+                        f.unlink()
         elif a.cmd == "draft":
             o = pipe.default_options()
             o.format, o.duration_days = ("AUCTION" if a.auction else "FIXED_PRICE"), a.days
